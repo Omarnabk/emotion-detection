@@ -1,10 +1,10 @@
+import argparse
+
 import cv2
 import keyboard
 import numpy as np
 
 from em_model import EMR
-
-full_screen = False
 
 EMOTIONS = ['Enfado', 'Asco', 'Temor', 'Felicidad', 'Tristeza', 'Sorpresa',
             'Neutral']  # ['angry', 'disgusted', 'fearful', 'happy', 'sad', 'surprised', 'neutral']
@@ -49,75 +49,86 @@ def format_image(image):
     return image
 
 
-# Initialize object of EMR class
-network = EMR()
-network.build_network()
+def main(cam_idx):
+    full_screen = True
 
-cap = cv2.VideoCapture(0)
-font = cv2.FONT_HERSHEY_SIMPLEX
-feelings_faces = []
+    # Initialize object of EMR class
+    network = EMR()
+    network.build_network()
 
-# append the list with the emoji images
-for index, emotion in enumerate(EMOTIONS):
-    feelings_faces.append(cv2.imread('./emojis/' + emotion + '.png', -1))
-facecasc = cv2.CascadeClassifier('haarcascade_files/haarcascade_frontalface_default.xml')
-while True:
-    # Again find haar cascade to draw bounding box around face
+    cap = cv2.VideoCapture(cam_idx)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    feelings_faces = []
 
-    _, frame = cap.read()
+    # append the list with the emoji images
+    for index, emotion in enumerate(EMOTIONS):
+        feelings_faces.append(cv2.imread('./emojis/' + emotion + '.png', -1))
+    facecasc = cv2.CascadeClassifier('haarcascade_files/haarcascade_frontalface_default.xml')
+    while True:
+        # Again find haar cascade to draw bounding box around face
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = facecasc.detectMultiScale(gray, 1.3, 5)
+        _, frame = cap.read()
 
-    # compute softmax probabilities
-    result = network.predict(format_image(frame))
-    if result is not None:
-        # write the different emotions and have a bar to indicate probabilities for each class
-        # for index, emotion in enumerate(EMOTIONS):
-        #     cv2.putText(frame, emotion, (10, index * 20 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1);
-        #     cv2.rectangle(frame, (130, index * 20 + 10), (130 + int(result[0][index] * 100), (index + 1) * 20 + 4),
-        #                   (255, 0, 0), -1)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = facecasc.detectMultiScale(gray, 1.3, 5)
 
-        # find the emotion with maximum probability and display it
-        maxindex = np.argmax(result[0])
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, EMOTIONS[maxindex], (10, 360), font, 2, (255, 255, 255), 2, cv2.LINE_AA)
-        face_image = feelings_faces[maxindex]
-        # print(face_image[:, :, 3])
+        # compute softmax probabilities
+        result = network.predict(format_image(frame))
+        if result is not None:
+            # write the different emotions and have a bar to indicate probabilities for each class
+            # for index, emotion in enumerate(EMOTIONS):
+            #     cv2.putText(frame, emotion, (10, index * 20 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1);
+            #     cv2.rectangle(frame, (130, index * 20 + 10), (130 + int(result[0][index] * 100), (index + 1) * 20 + 4),
+            #                   (255, 0, 0), -1)
 
-        for c in range(0, 3):
-            # the shape of face_image is (x,y,4)
-            # the fourth channel is 0 or 1
-            # in most cases it is 0, so, we assign the roi to the emoji
-            # you could also do:
-            # frame[200:320,10:130,c] = frame[200:320, 10:130, c] * (1.0 - face_image[:, :, 3] / 255.0)
-            frame[200:320, 10:130, c] = face_image[:, :, c] * (face_image[:, :, 3] / 255.0) + frame[200:320, 10:130,
-                                                                                              c] * (
-                                                1.0 - face_image[:, :, 3] / 255.0)
+            # find the emotion with maximum probability and display it
+            maxindex = np.argmax(result[0])
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(frame, EMOTIONS[maxindex], (10, 360), font, 2, (255, 255, 255), 2, cv2.LINE_AA)
+            face_image = feelings_faces[maxindex]
+            # print(face_image[:, :, 3])
 
-    if not len(faces) > 0:
-        # do nothing if no face is detected
-        a = 1
-    else:
-        # draw box around face with maximum area
-        max_area_face = faces[0]
-        for face in faces:
-            if face[2] * face[3] > max_area_face[2] * max_area_face[3]:
-                max_area_face = face
-        face = max_area_face
-        (x, y, w, h) = max_area_face
-        frame = cv2.rectangle(frame, (x, y - 50), (x + w, y + h + 10), (255, 0, 0), 2)
+            for c in range(0, 3):
+                # the shape of face_image is (x,y,4)
+                # the fourth channel is 0 or 1
+                # in most cases it is 0, so, we assign the roi to the emoji
+                # you could also do:
+                # frame[200:320,10:130,c] = frame[200:320, 10:130, c] * (1.0 - face_image[:, :, 3] / 255.0)
+                frame[200:320, 10:130, c] = face_image[:, :, c] * (face_image[:, :, 3] / 255.0) + frame[200:320, 10:130,
+                                                                                                  c] * (
+                                                    1.0 - face_image[:, :, 3] / 255.0)
 
-    if cv2.waitKey(1) & keyboard.is_pressed('f'):
-        full_screen = True
+        if not len(faces) > 0:
+            # do nothing if no face is detected
+            a = 1
+        else:
+            # draw box around face with maximum area
+            max_area_face = faces[0]
+            for face in faces:
+                if face[2] * face[3] > max_area_face[2] * max_area_face[3]:
+                    max_area_face = face
+            face = max_area_face
+            (x, y, w, h) = max_area_face
+            frame = cv2.rectangle(frame, (x, y - 50), (x + w, y + h + 10), (255, 0, 0), 2)
 
-    if full_screen:
-        cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        if cv2.waitKey(1) & keyboard.is_pressed('f'):
+            full_screen = True
 
-    cv2.imshow("window", cv2.resize(frame, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        if full_screen:
+            cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-cap.release()
-cv2.destroyAllWindows()
+        cv2.imshow("window", cv2.resize(frame, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    argParser = argparse.ArgumentParser()
+    argParser.add_argument("-c", "--cam", help="Camera Index", default=0)
+    args = argParser.parse_args()
+    cam_idx = args.cam
+    main(cam_idx=int(cam_idx))
